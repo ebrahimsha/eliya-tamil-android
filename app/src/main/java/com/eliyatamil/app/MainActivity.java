@@ -79,6 +79,20 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // Hide the website's own top branding header inside the app only.
+                // The native Android header remains visible; bottom navigation is untouched.
+                String js = "(function(){"
+                    + "var candidates=document.querySelectorAll('header, nav, .navbar, #header, #site-header, .site-header, [class*=header], [id*=header]');"
+                    + "for(var i=0;i<candidates.length;i++){"
+                    + "var e=candidates[i],r=e.getBoundingClientRect(),t=(e.innerText||e.textContent||'').toLowerCase();"
+                    + "if(r.top<160 && r.height>25 && r.height<180 && (t.indexOf('eliya tamil')>=0 || t.indexOf('எளிய தமிழ்')>=0)){"
+                    + "e.style.setProperty('display','none','important');e.style.setProperty('visibility','hidden','important');"
+                    + "}}})();";
+                view.evaluateJavascript(js, null);
+            }
+
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();

@@ -15,3 +15,7 @@ This initial build creates a debug APK for testing. Before public distribution, 
 
 ## Version 1.0.2
 - Added a fixed native app header with the official Eliya Tamil logo and title. Website content scrolls below it.
+
+
+## Version 1.0.2
+This update hides the duplicate website branding header inside the Android WebView. The native app header remains fixed. The website itself is unchanged, and bottom navigation is not intentionally hidden.
