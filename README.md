@@ -12,3 +12,6 @@ Package ID: `com.eliyatamil.app`
 Minimum Android version: 7.0 (API 24)
 
 This initial build creates a debug APK for testing. Before public distribution, create and securely store a release signing key. Keep the same key for every future APK update. Never commit the keystore or its passwords to this repository.
+
+## Version 1.0.2
+- Added a fixed native app header with the official Eliya Tamil logo and title. Website content scrolls below it.
