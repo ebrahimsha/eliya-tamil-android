@@ -1,1 +1,16 @@
-plugins { id 'com.android.application' version '8.6.1' apply false }
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.eliyatamil.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.eliyatamil.app'
+        minSdk 24
+        targetSdk 35
+        versionCode 5
+        versionName '1.0.4'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
