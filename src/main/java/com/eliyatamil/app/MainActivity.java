@@ -62,6 +62,10 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new AndroidSpeechBridge(),"EliyaNativeSpeech");
         webView.setWebChromeClient(new WebChromeClient(){@Override public void onProgressChanged(WebView v,int value){progress.setProgress(value);progress.setVisibility(value>=100?View.GONE:View.VISIBLE);}});
         webView.setWebViewClient(new WebViewClient(){
+            @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap favicon){super.onPageStarted(view,url,favicon);
+                // Install the shim before the site's own scripts run so they never see the (voiceless) native engine.
+                view.evaluateJavascript(nativeSpeechShim(),null);
+            }
             @Override public void onPageFinished(WebView view,String url){super.onPageFinished(view,url);
                 String hide="(function(){var c=document.querySelectorAll('header,nav,.navbar,#header,#site-header,.site-header,[class*=header],[id*=header]');for(var i=0;i<c.length;i++){var e=c[i],r=e.getBoundingClientRect(),t=(e.innerText||e.textContent||'').toLowerCase();if(r.top<160&&r.height>25&&r.height<180&&(t.indexOf('eliya tamil')>=0||t.indexOf('எளிய தமிழ்')>=0)){e.style.setProperty('display','none','important');e.style.setProperty('visibility','hidden','important');}}})();";
                 view.evaluateJavascript(hide,null);
@@ -75,8 +79,17 @@ public class MainActivity extends Activity {
 
     private void initializeNativeTts(){
         ttsStatus="Initializing Android TTS engine";
-        nativeTts=new TextToSpeech(this,status->{
-            if(status!=TextToSpeech.SUCCESS){ttsReady=false;ttsStatus="TTS engine initialization failed ("+status+")";injectTtsStatus();return;}
+        createTts(null);
+    }
+    private void createTts(final String enginePackage){
+        final TextToSpeech.OnInitListener listener=status->{
+            if(status!=TextToSpeech.SUCCESS){
+                ttsReady=false;
+                if(enginePackage==null){ // default engine failed: retry explicitly with Google Speech Services
+                    runOnUiThread(()->{try{if(nativeTts!=null)nativeTts.shutdown();}catch(Exception ignored){}createTts("com.google.android.tts");});
+                    return;
+                }
+                ttsStatus="TTS engine initialization failed ("+status+")";injectTtsStatus();return;}
             int tamil=nativeTts.setLanguage(new Locale("ta","IN"));
             if(tamil==TextToSpeech.LANG_MISSING_DATA){ttsStatus="Tamil voice data missing. Install Tamil voice data in Android Text-to-speech settings.";}
             else if(tamil==TextToSpeech.LANG_NOT_SUPPORTED){ttsStatus="Tamil voice not supported by current TTS engine. Try Google Speech Services and install Tamil voice.";}
@@ -89,7 +102,8 @@ public class MainActivity extends Activity {
                 @Override public void onError(String id){notifySpeechEvent(id,"error");}
                 @Override public void onError(String id,int errorCode){notifySpeechEvent(id,"error");}
             });injectTtsStatus();
-        });
+        };
+        nativeTts=enginePackage==null?new TextToSpeech(this,listener):new TextToSpeech(this,listener,enginePackage);
     }
     private void injectTtsStatus(){if(webView!=null)runOnUiThread(()->{if(webView!=null)webView.evaluateJavascript("window.__eliyaNativeTtsStatus="+jsQuote(ttsStatus)+";window.dispatchEvent(new Event('eliya-tts-ready'));",null);});}
     private void notifySpeechEvent(String id,String event){if(webView==null)return;String js="window.__eliyaNativeSpeechEvent&&window.__eliyaNativeSpeechEvent("+jsQuote(id)+","+jsQuote(event)+");";runOnUiThread(()->{if(webView!=null)webView.evaluateJavascript(js,null);});}
@@ -113,11 +127,11 @@ public class MainActivity extends Activity {
     }
     private Locale parseLocale(String language){if(language==null||language.trim().isEmpty())return new Locale("ta","IN");String n=language.replace('_','-').toLowerCase();if(n.equals("ta")||n.startsWith("ta-"))return new Locale("ta","IN");if(n.equals("en")||n.startsWith("en-"))return Locale.ENGLISH;return Locale.forLanguageTag(n);}
     private String nativeSpeechShim(){
-        return "(function(){try{if(!window.EliyaNativeSpeech)return;var b=window.EliyaNativeSpeech;window.__eliyaNativeSpeechShimInstalled=true;var active={},count=0;"
+        return "(function(){try{if(!window.EliyaNativeSpeech)return;if(window.__eliyaNativeSpeechShimInstalled)return;var b=window.EliyaNativeSpeech;window.__eliyaNativeSpeechShimInstalled=true;var active={},count=0;"
         +"window.__eliyaNativeSpeechEvent=function(id,event){var u=active[id];if(!u)return;var e={type:'on'+event,target:u};if(event==='start'&&u.onstart)u.onstart(e);if(event==='end'){if(u.onend)u.onend(e);delete active[id]}if(event==='error'){if(u.onerror)u.onerror(e);delete active[id]}};"
         +"if(!window.SpeechSynthesisUtterance){window.SpeechSynthesisUtterance=function(text){this.text=text||'';this.lang='ta-IN';this.rate=1;this.pitch=1;this.volume=1;this.onstart=null;this.onend=null;this.onerror=null;}}"
-        +"var shim={get speaking(){return Object.keys(active).length>0},get pending(){return false},get paused(){return false},speak:function(u){if(!u)return;var id='eliya-native-'+(++count);active[id]=u;var lang=u.lang||'ta-IN';b.speak(String(u.text||''),String(lang),id)},cancel:function(){b.stop();active={}},pause:function(){},resume:function(){},getVoices:function(){return []},onvoiceschanged:null};"
-        +"try{Object.defineProperty(window,'speechSynthesis',{configurable:true,writable:true,value:shim})}catch(e){window.speechSynthesis=shim}window.__eliyaTtsBridgeStatus=function(){return b.getStatus?b.getStatus():(b.isReady&&b.isReady()?'Ready':'Not ready')};"
+        +"var voice={name:'Tamil (Android)',lang:'ta-IN',default:true,localService:true,voiceURI:'ta-IN'};var shim={get speaking(){return Object.keys(active).length>0},get pending(){return false},get paused(){return false},speak:function(u){if(!u)return;var id='eliya-native-'+(++count);active[id]=u;var lang=u.lang||'ta-IN';b.speak(String(u.text||''),String(lang),id)},cancel:function(){b.stop();active={}},pause:function(){},resume:function(){},getVoices:function(){return [voice]},onvoiceschanged:null,addEventListener:function(){},removeEventListener:function(){},dispatchEvent:function(){return true}};"
+        +"try{Object.defineProperty(window,'speechSynthesis',{configurable:true,writable:true,value:shim})}catch(e){window.speechSynthesis=shim}setTimeout(function(){try{if(typeof shim.onvoiceschanged==='function')shim.onvoiceschanged(new Event('voiceschanged'))}catch(e){}},0);window.__eliyaTtsBridgeStatus=function(){return b.getStatus?b.getStatus():(b.isReady&&b.isReady()?'Ready':'Not ready')};"
         +"}catch(err){console.warn('Eliya native TTS bridge error',err)}})();";
     }
     private int dp(int v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}

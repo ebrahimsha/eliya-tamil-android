@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 11+ package visibility: required so TextToSpeech can find and bind to the TTS engine -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
